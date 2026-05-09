@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #f6f9fc;
+  color: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.print-area {
+  background: white;
+}
+
+@media print {
+  body {
+    background: white;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-area {
+    box-shadow: none !important;
+    border: none !important;
+  }
+}
