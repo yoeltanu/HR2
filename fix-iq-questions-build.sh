@@ -1,3 +1,19 @@
+#!/usr/bin/env bash
+set -e
+
+echo "Fixing IQ question bank and build exports..."
+
+mkdir -p lib/iq
+
+if [ -f "lib/iq/iqQuestions.ts" ]; then
+  cp "lib/iq/iqQuestions.ts" "lib/iq/iqQuestions.ts.backup.$(date +%Y%m%d%H%M%S)"
+fi
+
+if [ -f "lib/iqQuestions.ts" ]; then
+  cp "lib/iqQuestions.ts" "lib/iqQuestions.ts.backup.$(date +%Y%m%d%H%M%S)"
+fi
+
+cat > lib/iq/iqQuestions.ts <<'EOF'
 import type {
   IQCategory,
   IQDifficulty,
@@ -916,3 +932,40 @@ export function getIQDurationSeconds(level: 1 | 2 | 3): number {
 export function getIQQuestionCountByLevel(level: 1 | 2 | 3): number {
   return getIQQuestionsByLevel(level).length;
 }
+EOF
+
+cat > lib/iq/iqLevel3Questions.ts <<'EOF'
+import type { IQQuestion } from "@/types/iq";
+
+/**
+ * Backward compatibility file.
+ * Level 3 questions are now exported from lib/iq/iqQuestions.ts.
+ */
+export const iqLevel3Questions: IQQuestion[] = [];
+EOF
+
+cat > lib/iqQuestions.ts <<'EOF'
+export {
+  iqQuestions,
+  getIQQuestionsByLevel,
+  getIQDurationSeconds,
+  getIQQuestionCountByLevel
+} from "./iq/iqQuestions";
+EOF
+
+node <<'NODE'
+const { readFileSync } = require("fs");
+
+const file = readFileSync("lib/iq/iqQuestions.ts", "utf8");
+
+const counts = {
+  L1: (file.match(/level1Seeds/g) || []).length,
+};
+
+console.log("✅ Rebuilt lib/iq/iqQuestions.ts");
+console.log("✅ Added compatibility export lib/iqQuestions.ts");
+NODE
+
+echo ""
+echo "Now checking TypeScript build..."
+npm run build

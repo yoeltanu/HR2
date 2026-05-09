@@ -1,0 +1,50 @@
+﻿import type { IQQuestion } from "@/types/iq";
+import { iqLevel1Questions } from "./iqLevel1Questions";
+import { iqLevel2Questions } from "./iqLevel2Questions";
+import { iqLevel3Questions } from "./iqLevel3Questions";
+
+export const iqQuestions: IQQuestion[] = [
+  ...iqLevel1Questions,
+  ...iqLevel2Questions,
+  ...iqLevel3Questions,
+];
+
+function normalizeIQLevel(level?: string | number | null): 1 | 2 | 3 {
+  if (level === null || level === undefined) return 1;
+
+  const normalizedLevel = String(level).toLowerCase();
+
+  if (
+    normalizedLevel === "3" ||
+    normalizedLevel.includes("advanced") ||
+    normalizedLevel.includes("level 3")
+  ) {
+    return 3;
+  }
+
+  if (
+    normalizedLevel === "2" ||
+    normalizedLevel.includes("intermediate") ||
+    normalizedLevel.includes("level 2")
+  ) {
+    return 2;
+  }
+
+  return 1;
+}
+
+export function getIQQuestionsByLevel(
+  level?: string | number | null
+): IQQuestion[] {
+  const iqLevel = normalizeIQLevel(level);
+  return iqQuestions.filter((question) => question.level === iqLevel);
+}
+
+export function getIQDurationSeconds(level?: string | number | null): number {
+  const iqLevel = normalizeIQLevel(level);
+
+  if (iqLevel === 3) return 20 * 60;
+  if (iqLevel === 2) return 15 * 60;
+
+  return 10 * 60;
+}

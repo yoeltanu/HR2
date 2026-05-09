@@ -3,15 +3,13 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import CandidateDetail from "@/components/admin/CandidateDetail";
-import { getDemoRecordById, seedSampleDemoRecords } from "@/lib/storage/localStorageDemo";
+import { getDemoRecordById } from "@/lib/storage/localStorageDemo";
 import type { AssessmentRecord } from "@/types/assessment";
 
 export default function CandidateDetailPage({
   params
 }: {
-  params: {
-    id: string;
-  };
+  params: { id: string };
 }) {
   const [record, setRecord] = useState<AssessmentRecord | null>(null);
   const [error, setError] = useState("");
@@ -26,18 +24,11 @@ export default function CandidateDetailPage({
         const data = await response.json();
 
         if (!response.ok || !data.success) {
-          throw new Error(data.message || "Gagal mengambil detail kandidat.");
+          throw new Error(data.message || "Gagal mengambil detail.");
         }
 
         if (data.demo) {
-          let demoRecord = getDemoRecordById(params.id);
-
-          if (!demoRecord) {
-            seedSampleDemoRecords();
-            demoRecord = getDemoRecordById(params.id);
-          }
-
-          setRecord(demoRecord);
+          setRecord(getDemoRecordById(params.id));
         } else {
           setRecord(data.candidate);
         }
@@ -47,15 +38,7 @@ export default function CandidateDetailPage({
             ? `${err.message} Data demo localStorage ditampilkan.`
             : "Fallback demo detail."
         );
-
-        let demoRecord = getDemoRecordById(params.id);
-
-        if (!demoRecord) {
-          seedSampleDemoRecords();
-          demoRecord = getDemoRecordById(params.id);
-        }
-
-        setRecord(demoRecord);
+        setRecord(getDemoRecordById(params.id));
       } finally {
         setLoading(false);
       }
@@ -82,7 +65,8 @@ export default function CandidateDetailPage({
             Data kandidat tidak ditemukan
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            Klik Load Sample Data di dashboard, lalu buka detail kandidat lagi.
+            Pastikan kandidat sudah submit assessment di browser yang sama jika
+            masih menggunakan Demo Mode.
           </p>
         </div>
       ) : (
