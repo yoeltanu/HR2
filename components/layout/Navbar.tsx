@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
+import { APP_NAME } from "@/lib/utils/config";
 
 export default function Navbar() {
   return (
@@ -9,17 +10,8 @@ export default function Navbar() {
           <span className="grid h-10 w-10 place-items-center rounded-2xl bg-cyanx text-navy-950">
             <ShieldCheck className="h-5 w-5" />
           </span>
-          <span>HR Assessment Platform</span>
+          <span>{APP_NAME}</span>
         </Link>
-
-        <nav className="flex items-center gap-4 text-sm text-slate-200">
-          <Link href="/test/start" className="hover:text-cyanx">
-            Mulai Tes
-          </Link>
-          <Link href="/admin/login" className="hover:text-cyanx">
-            Admin
-          </Link>
-        </nav>
       </div>
     </header>
   );

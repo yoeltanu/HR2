@@ -1,4 +1,40 @@
-import Link from "next/link";
+const fs = require("fs");
+const path = require("path");
+
+function write(file, content) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, content, "utf8");
+  console.log("Updated:", file);
+}
+
+// Navbar tanpa link kanan atas
+write(
+  "components/layout/Navbar.tsx",
+`import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
+import { APP_NAME } from "@/lib/utils/config";
+
+export default function Navbar() {
+  return (
+    <header className="no-print border-b border-white/10 bg-navy-950/90 text-white backdrop-blur">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <Link href="/" className="flex items-center gap-3 font-semibold">
+          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-cyanx text-navy-950">
+            <ShieldCheck className="h-5 w-5" />
+          </span>
+          <span>{APP_NAME}</span>
+        </Link>
+      </div>
+    </header>
+  );
+}
+`
+);
+
+// Landing page tanpa tombol Login Admin
+write(
+  "app/page.tsx",
+`import Link from "next/link";
 import { ArrowRight, Brain, UsersRound } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import Disclaimer from "@/components/ui/Disclaimer";
@@ -84,3 +120,9 @@ function Feature({
     </div>
   );
 }
+`
+);
+
+console.log("");
+console.log("✅ Admin links removed successfully.");
+console.log("Run: npm run build");
