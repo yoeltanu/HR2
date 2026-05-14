@@ -140,10 +140,10 @@ export default function CandidateTable({
                     />
                   </td>
                   <td className="px-4 py-3 font-semibold text-slate-950">
-                    {row.full_name}
+                    {String(row.full_name || "-")}
                   </td>
-                  <td className="px-4 py-3">{row.whatsapp}</td>
-                  <td className="px-4 py-3">{row.position_applied}</td>
+                  <td className="px-4 py-3">{String(row.whatsapp || "-")}</td>
+                  <td className="px-4 py-3">{String(row.position_applied || "-")}</td>
                   <td className="px-4 py-3">{formatDateTime(row.created_at)}</td>
                   <td className="px-4 py-3">
                     <DiscBadge type={row.disc_type || "-"} />
@@ -161,10 +161,10 @@ export default function CandidateTable({
                     <FitScoreBadge score={Number(row.combined_score || 0)} />
                   </td>
                   <td className="px-4 py-3 font-semibold">
-                    {row.final_recommendation}
+                    {String(row.final_recommendation || "-")}
                   </td>
                   <td className="px-4 py-3">
-                    <RedFlagBadge flags={row.red_flags} />
+                    <RedFlagBadge flags={String(row.red_flags || "").split(" | ").filter(Boolean)} />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex gap-2">

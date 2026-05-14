@@ -106,17 +106,17 @@ export default function DashboardPage() {
     return normalized.filter((row) => {
       const matchSearch =
         !search ||
-        row.full_name.toLowerCase().includes(search.toLowerCase()) ||
-        row.whatsapp.toLowerCase().includes(search.toLowerCase());
+        String(row.full_name || "").toLowerCase().includes(search.toLowerCase()) ||
+        String(row.whatsapp || "").toLowerCase().includes(search.toLowerCase());
 
       const matchPosition =
         !position ||
-        row.position_applied.toLowerCase().includes(position.toLowerCase());
+        String(row.position_applied || "").toLowerCase().includes(position.toLowerCase());
 
-      const matchDisc = !disc || row.disc_type.includes(disc);
+      const matchDisc = !disc || String(row.disc_type || "").includes(disc);
 
       const matchRecommendation =
-        !recommendation || row.final_recommendation === recommendation;
+        !recommendation || String(row.final_recommendation || "") === recommendation;
 
       return matchSearch && matchPosition && matchDisc && matchRecommendation;
     });
