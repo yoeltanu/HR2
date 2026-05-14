@@ -163,3 +163,19 @@ export function buildAndStoreDemoRecord(_payload: AssessmentPayload): Assessment
     "buildAndStoreDemoRecord tidak dipakai. Submit record dibuat melalui /api/submit lalu disimpan memakai storeDemoRecord()."
   );
 }
+
+
+export function deleteDemoCandidates(candidateIds: string[]): AssessmentRecord[] {
+  const ids = new Set(candidateIds);
+  const records = getDemoRecords();
+  const next = records.filter((record) => !ids.has(record.candidate_id));
+
+  localStorage.setItem(RECORDS_KEY, JSON.stringify(next));
+
+  const last = getLastRecord();
+  if (last && ids.has(last.candidate_id)) {
+    localStorage.removeItem(LAST_RECORD_KEY);
+  }
+
+  return next;
+}

@@ -143,3 +143,83 @@ export async function healthCheckGoogleSheets() {
 
   return data;
 }
+
+
+export async function fetchSettingsFromGoogleSheets() {
+  const config = getConfig();
+
+  if (!config.url || !config.secret) {
+    return { success: true, demo: true, settings: {} };
+  }
+
+  const url = `${config.url}?action=getSettings&secret=${encodeURIComponent(config.secret)}`;
+
+  const response = await fetch(url, { cache: "no-store" });
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.message || "Gagal mengambil settings.");
+  }
+
+  return data;
+}
+
+export async function updateSettingToGoogleSheets(key: string, value: string) {
+  const config = getConfig();
+
+  if (!config.url || !config.secret) {
+    return { success: true, demo: true, key, value };
+  }
+
+  const response = await fetch(config.url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "updateSetting",
+      secret: config.secret,
+      key,
+      value
+    }),
+    cache: "no-store"
+  });
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.message || "Gagal menyimpan settings.");
+  }
+
+  return data;
+}
+
+
+export async function deleteCandidatesFromGoogleSheets(
+  candidateIds: string[],
+  deletedBy = "admin"
+) {
+  const config = getConfig();
+
+  if (!config.url || !config.secret) {
+    return { success: true, demo: true, deletedCount: candidateIds.length };
+  }
+
+  const response = await fetch(config.url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "deleteCandidates",
+      secret: config.secret,
+      candidateIds,
+      deletedBy
+    }),
+    cache: "no-store"
+  });
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.message || "Gagal menghapus kandidat.");
+  }
+
+  return data;
+}

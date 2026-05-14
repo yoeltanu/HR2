@@ -1,4 +1,342 @@
+const fs = require("fs");
+const path = require("path");
 
+function write(file, content) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, content, "utf8");
+  console.log("Updated:", file);
+}
+
+const localStorageFile = "lib/storage/localStorageDemo.ts";
+if (fs.existsSync(localStorageFile)) {
+  let text = fs.readFileSync(localStorageFile, "utf8");
+
+  if (!text.includes("deleteDemoCandidates")) {
+    text += `
+
+export function deleteDemoCandidates(candidateIds: string[]): AssessmentRecord[] {
+  const ids = new Set(candidateIds);
+  const records = getDemoRecords();
+  const next = records.filter((record) => !ids.has(record.candidate_id));
+
+  localStorage.setItem(RECORDS_KEY, JSON.stringify(next));
+
+  const last = getLastRecord();
+  if (last && ids.has(last.candidate_id)) {
+    localStorage.removeItem(LAST_RECORD_KEY);
+  }
+
+  return next;
+}
+`;
+    fs.writeFileSync(localStorageFile, text, "utf8");
+    console.log("Patched:", localStorageFile);
+  }
+}
+
+write("app/api/candidates/delete/route.ts", `
+import { NextRequest, NextResponse } from "next/server";
+import { ADMIN_COOKIE_NAME } from "@/lib/utils/auth";
+import {
+  deleteCandidatesFromGoogleSheets,
+  isGoogleSheetsConfigured
+} from "@/lib/storage/googleSheets";
+
+export async function DELETE(request: NextRequest) {
+  const isAdmin = request.cookies.get(ADMIN_COOKIE_NAME)?.value === "1";
+
+  if (!isAdmin) {
+    return NextResponse.json(
+      { success: false, message: "Unauthorized" },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const candidateIds = Array.isArray(body.candidateIds)
+      ? body.candidateIds.filter(Boolean)
+      : [];
+
+    if (!candidateIds.length) {
+      return NextResponse.json(
+        { success: false, message: "candidateIds wajib diisi." },
+        { status: 400 }
+      );
+    }
+
+    if (!isGoogleSheetsConfigured()) {
+      return NextResponse.json({
+        success: true,
+        demo: true,
+        deletedCount: candidateIds.length
+      });
+    }
+
+    const result = await deleteCandidatesFromGoogleSheets(candidateIds, "admin");
+
+    return NextResponse.json({
+      success: true,
+      demo: false,
+      deletedCount: result.deletedCount || candidateIds.length
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Gagal menghapus kandidat."
+      },
+      { status: 500 }
+    );
+  }
+}
+`);
+
+const googleSheetsFile = "lib/storage/googleSheets.ts";
+if (fs.existsSync(googleSheetsFile)) {
+  let text = fs.readFileSync(googleSheetsFile, "utf8");
+
+  if (!text.includes("deleteCandidatesFromGoogleSheets")) {
+    text += `
+
+export async function deleteCandidatesFromGoogleSheets(
+  candidateIds: string[],
+  deletedBy = "admin"
+) {
+  const config = getConfig();
+
+  if (!config.url || !config.secret) {
+    return { success: true, demo: true, deletedCount: candidateIds.length };
+  }
+
+  const response = await fetch(config.url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "deleteCandidates",
+      secret: config.secret,
+      candidateIds,
+      deletedBy
+    }),
+    cache: "no-store"
+  });
+
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.message || "Gagal menghapus kandidat.");
+  }
+
+  return data;
+}
+`;
+    fs.writeFileSync(googleSheetsFile, text, "utf8");
+    console.log("Patched:", googleSheetsFile);
+  }
+}
+
+write("components/admin/CandidateTable.tsx", `
+"use client";
+
+import Link from "next/link";
+import DiscBadge from "@/components/disc/DiscBadge";
+import FitScoreBadge from "./FitScoreBadge";
+import RedFlagBadge from "./RedFlagBadge";
+import type { AssessmentRecord } from "@/types/assessment";
+import type { CandidateSummaryRow } from "@/types/candidate";
+import { formatDateTime } from "@/lib/utils/format";
+import { buildWhatsAppUrl } from "@/lib/utils/whatsapp";
+
+type AnyRow = AssessmentRecord | CandidateSummaryRow;
+
+function normalize(row: AnyRow): CandidateSummaryRow {
+  if ("candidate" in row) {
+    return {
+      candidate_id: row.candidate_id,
+      created_at: row.created_at,
+      full_name: row.candidate.fullName,
+      whatsapp: row.candidate.whatsapp,
+      email: row.candidate.email,
+      position_applied: row.candidate.positionApplied,
+      domicile: row.candidate.domicile,
+      age: row.candidate.age,
+      education: row.candidate.education,
+      last_experience: row.candidate.lastExperience,
+      source: row.candidate.source,
+      assessment_level: String(row.candidate.assessmentLevel),
+      disc_type: row.disc.type,
+      disc_fit_score: row.disc.fitScore,
+      iq_score: row.iq.percentageScore,
+      iq_fit_score: row.iq.fitScore,
+      combined_score: row.combined.score,
+      combined_category: row.combined.category,
+      final_recommendation: row.combined.recommendation,
+      red_flags: row.redFlags.join(" | "),
+      summary: row.summary
+    } as CandidateSummaryRow;
+  }
+
+  return row;
+}
+
+export function normalizeCandidateRows(rows: AnyRow[]): CandidateSummaryRow[] {
+  return rows
+    .map(normalize)
+    .filter((row: any) => String(row.is_deleted || "").toUpperCase() !== "TRUE");
+}
+
+export default function CandidateTable({
+  rows,
+  selectedIds,
+  onSelectedIdsChange,
+  whatsappTemplate
+}: {
+  rows: AnyRow[];
+  selectedIds?: string[];
+  onSelectedIdsChange?: (ids: string[]) => void;
+  whatsappTemplate?: string;
+}) {
+  const normalized = normalizeCandidateRows(rows);
+  const checkedIds = selectedIds || [];
+  const allIds = normalized.map((row) => row.candidate_id);
+  const allSelected =
+    allIds.length > 0 && allIds.every((id) => checkedIds.includes(id));
+
+  function toggleOne(id: string) {
+    if (!onSelectedIdsChange) return;
+
+    if (checkedIds.includes(id)) {
+      onSelectedIdsChange(checkedIds.filter((item) => item !== id));
+    } else {
+      onSelectedIdsChange([...checkedIds, id]);
+    }
+  }
+
+  function toggleAll() {
+    if (!onSelectedIdsChange) return;
+
+    if (allSelected) {
+      onSelectedIdsChange(checkedIds.filter((id) => !allIds.includes(id)));
+    } else {
+      onSelectedIdsChange(Array.from(new Set([...checkedIds, ...allIds])));
+    }
+  }
+
+  if (!normalized.length) {
+    return (
+      <div className="rounded-3xl bg-white p-10 text-center shadow-sm">
+        <p className="text-lg font-bold text-slate-900">Belum ada kandidat</p>
+        <p className="mt-1 text-sm text-slate-500">
+          Data akan muncul setelah kandidat menyelesaikan assessment.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-3xl bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1250px] text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <tr>
+              <th className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                />
+              </th>
+              <th className="px-4 py-3">Nama</th>
+              <th className="px-4 py-3">WhatsApp</th>
+              <th className="px-4 py-3">Posisi</th>
+              <th className="px-4 py-3">Tanggal</th>
+              <th className="px-4 py-3">DISC</th>
+              <th className="px-4 py-3">DISC Fit</th>
+              <th className="px-4 py-3">IQ Score</th>
+              <th className="px-4 py-3">IQ Fit</th>
+              <th className="px-4 py-3">Combined</th>
+              <th className="px-4 py-3">Rekomendasi</th>
+              <th className="px-4 py-3">Flags</th>
+              <th className="px-4 py-3">Action</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {normalized.map((row) => {
+              const waUrl = whatsappTemplate
+                ? buildWhatsAppUrl(row, whatsappTemplate)
+                : "";
+
+              return (
+                <tr key={row.candidate_id} className="border-t border-slate-100">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={checkedIds.includes(row.candidate_id)}
+                      onChange={() => toggleOne(row.candidate_id)}
+                    />
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-slate-950">
+                    {row.full_name}
+                  </td>
+                  <td className="px-4 py-3">{row.whatsapp}</td>
+                  <td className="px-4 py-3">{row.position_applied}</td>
+                  <td className="px-4 py-3">{formatDateTime(row.created_at)}</td>
+                  <td className="px-4 py-3">
+                    <DiscBadge type={row.disc_type || "-"} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <FitScoreBadge score={Number(row.disc_fit_score || 0)} />
+                  </td>
+                  <td className="px-4 py-3">
+                    {Math.round(Number(row.iq_score || 0))}%
+                  </td>
+                  <td className="px-4 py-3">
+                    <FitScoreBadge score={Number(row.iq_fit_score || 0)} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <FitScoreBadge score={Number(row.combined_score || 0)} />
+                  </td>
+                  <td className="px-4 py-3 font-semibold">
+                    {row.final_recommendation}
+                  </td>
+                  <td className="px-4 py-3">
+                    <RedFlagBadge flags={row.red_flags} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <Link
+                        className="rounded-xl bg-cyan-50 px-3 py-2 font-bold text-cyan-700 hover:bg-cyan-100"
+                        href={"/admin/candidate/" + row.candidate_id}
+                      >
+                        Detail
+                      </Link>
+
+                      <button
+                        type="button"
+                        disabled={!waUrl}
+                        onClick={() => window.open(waUrl, "_blank")}
+                        className="rounded-xl bg-emerald-50 px-3 py-2 font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        WhatsApp
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+`);
+
+write("app/admin/dashboard/page.tsx", `
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -369,3 +707,8 @@ export default function DashboardPage() {
     </AdminLayout>
   );
 }
+`);
+
+console.log("");
+console.log("✅ Part B selesai.");
+console.log("Sekarang jalankan: npm run build");

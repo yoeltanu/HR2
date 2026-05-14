@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -7,6 +8,7 @@ import RedFlagBadge from "./RedFlagBadge";
 import type { AssessmentRecord } from "@/types/assessment";
 import type { CandidateSummaryRow } from "@/types/candidate";
 import { formatDateTime } from "@/lib/utils/format";
+import { buildWhatsAppUrl } from "@/lib/utils/whatsapp";
 
 type AnyRow = AssessmentRecord | CandidateSummaryRow;
 
@@ -34,25 +36,59 @@ function normalize(row: AnyRow): CandidateSummaryRow {
       final_recommendation: row.combined.recommendation,
       red_flags: row.redFlags.join(" | "),
       summary: row.summary
-    };
+    } as CandidateSummaryRow;
   }
 
   return row;
 }
 
 export function normalizeCandidateRows(rows: AnyRow[]): CandidateSummaryRow[] {
-  return rows.map(normalize);
+  return rows
+    .map(normalize)
+    .filter((row: any) => String(row.is_deleted || "").toUpperCase() !== "TRUE");
 }
 
-export default function CandidateTable({ rows }: { rows: AnyRow[] }) {
+export default function CandidateTable({
+  rows,
+  selectedIds,
+  onSelectedIdsChange,
+  whatsappTemplate
+}: {
+  rows: AnyRow[];
+  selectedIds?: string[];
+  onSelectedIdsChange?: (ids: string[]) => void;
+  whatsappTemplate?: string;
+}) {
   const normalized = normalizeCandidateRows(rows);
+  const checkedIds = selectedIds || [];
+  const allIds = normalized.map((row) => row.candidate_id);
+  const allSelected =
+    allIds.length > 0 && allIds.every((id) => checkedIds.includes(id));
+
+  function toggleOne(id: string) {
+    if (!onSelectedIdsChange) return;
+
+    if (checkedIds.includes(id)) {
+      onSelectedIdsChange(checkedIds.filter((item) => item !== id));
+    } else {
+      onSelectedIdsChange([...checkedIds, id]);
+    }
+  }
+
+  function toggleAll() {
+    if (!onSelectedIdsChange) return;
+
+    if (allSelected) {
+      onSelectedIdsChange(checkedIds.filter((id) => !allIds.includes(id)));
+    } else {
+      onSelectedIdsChange(Array.from(new Set([...checkedIds, ...allIds])));
+    }
+  }
 
   if (!normalized.length) {
     return (
       <div className="rounded-3xl bg-white p-10 text-center shadow-sm">
-        <p className="text-lg font-bold text-slate-900">
-          Belum ada kandidat
-        </p>
+        <p className="text-lg font-bold text-slate-900">Belum ada kandidat</p>
         <p className="mt-1 text-sm text-slate-500">
           Data akan muncul setelah kandidat menyelesaikan assessment.
         </p>
@@ -63,9 +99,16 @@ export default function CandidateTable({ rows }: { rows: AnyRow[] }) {
   return (
     <div className="overflow-hidden rounded-3xl bg-white shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1150px] text-left text-sm">
+        <table className="w-full min-w-[1250px] text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
+              <th className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                />
+              </th>
               <th className="px-4 py-3">Nama</th>
               <th className="px-4 py-3">WhatsApp</th>
               <th className="px-4 py-3">Posisi</th>
@@ -82,45 +125,69 @@ export default function CandidateTable({ rows }: { rows: AnyRow[] }) {
           </thead>
 
           <tbody>
-            {normalized.map((row) => (
-              <tr key={row.candidate_id} className="border-t border-slate-100">
-                <td className="px-4 py-3 font-semibold text-slate-950">
-                  {row.full_name}
-                </td>
-                <td className="px-4 py-3">{row.whatsapp}</td>
-                <td className="px-4 py-3">{row.position_applied}</td>
-                <td className="px-4 py-3">{formatDateTime(row.created_at)}</td>
-                <td className="px-4 py-3">
-                  <DiscBadge type={row.disc_type || "-"} />
-                </td>
-                <td className="px-4 py-3">
-                  <FitScoreBadge score={Number(row.disc_fit_score || 0)} />
-                </td>
-                <td className="px-4 py-3">
-                  {Math.round(Number(row.iq_score || 0))}%
-                </td>
-                <td className="px-4 py-3">
-                  <FitScoreBadge score={Number(row.iq_fit_score || 0)} />
-                </td>
-                <td className="px-4 py-3">
-                  <FitScoreBadge score={Number(row.combined_score || 0)} />
-                </td>
-                <td className="px-4 py-3 font-semibold">
-                  {row.final_recommendation}
-                </td>
-                <td className="px-4 py-3">
-                  <RedFlagBadge flags={row.red_flags} />
-                </td>
-                <td className="px-4 py-3">
-                  <Link
-                    className="rounded-xl bg-cyan-50 px-3 py-2 font-bold text-cyan-700 hover:bg-cyan-100"
-                    href={`/admin/candidate/${row.candidate_id}`}
-                  >
-                    Detail
-                  </Link>
-                </td>
-              </tr>
-            ))}
+            {normalized.map((row) => {
+              const waUrl = whatsappTemplate
+                ? buildWhatsAppUrl(row, whatsappTemplate)
+                : "";
+
+              return (
+                <tr key={row.candidate_id} className="border-t border-slate-100">
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={checkedIds.includes(row.candidate_id)}
+                      onChange={() => toggleOne(row.candidate_id)}
+                    />
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-slate-950">
+                    {row.full_name}
+                  </td>
+                  <td className="px-4 py-3">{row.whatsapp}</td>
+                  <td className="px-4 py-3">{row.position_applied}</td>
+                  <td className="px-4 py-3">{formatDateTime(row.created_at)}</td>
+                  <td className="px-4 py-3">
+                    <DiscBadge type={row.disc_type || "-"} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <FitScoreBadge score={Number(row.disc_fit_score || 0)} />
+                  </td>
+                  <td className="px-4 py-3">
+                    {Math.round(Number(row.iq_score || 0))}%
+                  </td>
+                  <td className="px-4 py-3">
+                    <FitScoreBadge score={Number(row.iq_fit_score || 0)} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <FitScoreBadge score={Number(row.combined_score || 0)} />
+                  </td>
+                  <td className="px-4 py-3 font-semibold">
+                    {row.final_recommendation}
+                  </td>
+                  <td className="px-4 py-3">
+                    <RedFlagBadge flags={row.red_flags} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <Link
+                        className="rounded-xl bg-cyan-50 px-3 py-2 font-bold text-cyan-700 hover:bg-cyan-100"
+                        href={"/admin/candidate/" + row.candidate_id}
+                      >
+                        Detail
+                      </Link>
+
+                      <button
+                        type="button"
+                        disabled={!waUrl}
+                        onClick={() => window.open(waUrl, "_blank")}
+                        className="rounded-xl bg-emerald-50 px-3 py-2 font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        WhatsApp
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

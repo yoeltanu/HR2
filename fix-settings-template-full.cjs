@@ -1,4 +1,8 @@
-"use client";
+const fs = require("fs");
+
+fs.writeFileSync(
+  "app/admin/settings/page.tsx",
+`"use client";
 
 import { useEffect, useState } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
@@ -416,3 +420,8 @@ export default function SettingsPage() {
     </AdminLayout>
   );
 }
+`,
+  "utf8"
+);
+
+console.log("✅ Fixed app/admin/settings/page.tsx");
