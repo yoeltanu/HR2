@@ -2,8 +2,8 @@ import type { AssessmentRecord } from "@/types/assessment";
 
 function getConfig() {
   return {
-    url: process.env.GOOGLE_SCRIPT_URL || "",
-    secret: process.env.GOOGLE_SCRIPT_SECRET || ""
+    url: (process.env.GOOGLE_SCRIPT_URL || "").trim(),
+    secret: (process.env.GOOGLE_SCRIPT_SECRET || "").trim()
   };
 }
 
@@ -222,4 +222,79 @@ export async function deleteCandidatesFromGoogleSheets(
   }
 
   return data;
+}
+
+
+export async function loginAdminToGoogleSheets(username: string, password: string) {
+  const config = getConfig();
+
+  if (!config.url || !config.secret) {
+    return { success: false, demo: true, message: "Google Sheets belum dikonfigurasi." };
+  }
+
+  const response = await fetch(config.url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "loginAdmin",
+      secret: config.secret,
+      username,
+      password
+    }),
+    cache: "no-store"
+  });
+
+  return parseJsonResponse(response);
+}
+
+export async function getAdminUsersFromGoogleSheets() {
+  const config = getConfig();
+
+  const url = `${config.url}?action=getAdminUsers&secret=${encodeURIComponent(config.secret)}`;
+  const response = await fetch(url, { cache: "no-store" });
+
+  return parseJsonResponse(response);
+}
+
+export async function addAdminUserToGoogleSheets(payload: {
+  username: string;
+  password: string;
+  role: string;
+}) {
+  const config = getConfig();
+
+  const response = await fetch(config.url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "addAdminUser",
+      secret: config.secret,
+      ...payload
+    }),
+    cache: "no-store"
+  });
+
+  return parseJsonResponse(response);
+}
+
+export async function updateAdminUserToGoogleSheets(payload: {
+  username: string;
+  password?: string;
+  active?: boolean;
+  role?: string;
+}) {
+  const config = getConfig();
+
+  const response = await fetch(config.url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      action: "updateAdminUser",
+      secret: config.secret,
+      ...payload
+    }),
+    cache: "no-store"
+  });
+
+  return parseJsonResponse(response);
 }

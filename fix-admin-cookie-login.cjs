@@ -1,4 +1,8 @@
-import { NextResponse } from "next/server";
+const fs = require("fs");
+
+fs.writeFileSync(
+  "lib/utils/auth.ts",
+`import { NextResponse } from "next/server";
 
 export const ADMIN_COOKIE_NAME = "hr_admin_session";
 export const ADMIN_STORAGE_KEY = "hr_admin_session";
@@ -7,14 +11,14 @@ export function setAdminSessionClient(): void {
   if (typeof window === "undefined") return;
 
   localStorage.setItem(ADMIN_STORAGE_KEY, "1");
-  document.cookie = `${ADMIN_COOKIE_NAME}=1; path=/; max-age=${60 * 60 * 12}; SameSite=Lax`;
+  document.cookie = \`\${ADMIN_COOKIE_NAME}=1; path=/; max-age=\${60 * 60 * 12}; SameSite=Lax\`;
 }
 
 export function clearAdminSessionClient(): void {
   if (typeof window === "undefined") return;
 
   localStorage.removeItem(ADMIN_STORAGE_KEY);
-  document.cookie = `${ADMIN_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+  document.cookie = \`\${ADMIN_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax\`;
 }
 
 export function isAdminSessionClient(): boolean {
@@ -24,7 +28,7 @@ export function isAdminSessionClient(): boolean {
   const cookie = document.cookie
     .split(";")
     .map((item) => item.trim())
-    .some((item) => item === `${ADMIN_COOKIE_NAME}=1`);
+    .some((item) => item === \`\${ADMIN_COOKIE_NAME}=1\`);
 
   return local || cookie;
 }
@@ -41,8 +45,8 @@ export function createAdminSessionResponse(data: unknown) {
 
   return response;
 }
+`,
+  "utf8"
+);
 
-
-export function hasAdminSessionClient(): boolean {
-  return isAdminSessionClient();
-}
+console.log("✅ Fixed admin session cookie.");

@@ -1,4 +1,14 @@
-const CANDIDATES_HEADERS = [
+const fs = require("fs");
+const path = require("path");
+
+const dir = "google-apps-script";
+const file = path.join(dir, "Code.gs");
+
+fs.mkdirSync(dir, { recursive: true });
+
+fs.writeFileSync(
+  file,
+`const CANDIDATES_HEADERS = [
   "candidate_id","created_at","full_name","whatsapp","email","position_applied",
   "domicile","age","education","last_experience","source","assessment_level",
   "disc_type","disc_fit_score","iq_score","iq_fit_score","combined_score",
@@ -485,3 +495,16 @@ function updateAdminUser(username, password, active, role) {
     message: "Admin tidak ditemukan."
   };
 }
+`,
+  "utf8"
+);
+
+console.log("✅ Code.gs package generated at google-apps-script/Code.gs");
+console.log("");
+console.log("NEXT:");
+console.log("1. Copy isi google-apps-script/Code.gs");
+console.log("2. Paste ke Apps Script Code.gs");
+console.log("3. Save");
+console.log("4. Run setupSheets()");
+console.log("5. Deploy > Manage deployments > Edit > New version > Deploy");
+console.log("6. Test kandidat baru");

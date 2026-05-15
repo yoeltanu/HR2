@@ -1,4 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+const fs = require("fs");
+
+fs.writeFileSync(
+  "app/api/candidates/route.ts",
+`import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_COOKIE_NAME } from "@/lib/utils/auth";
 import {
   fetchCandidatesFromGoogleSheets,
@@ -53,3 +57,8 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+`,
+  "utf8"
+);
+
+console.log("✅ Patched /api/candidates with debug source.");

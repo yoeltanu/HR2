@@ -1,29 +1,46 @@
-import { NextResponse } from "next/server";
-import { ADMIN_COOKIE_NAME } from "@/lib/utils/auth";
 
-export async function POST(request: Request) {
-  const body = await request.json().catch(() => ({}));
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminSessionResponse } from "@/lib/utils/auth";
+import {
+  isGoogleSheetsConfigured,
+  loginAdminToGoogleSheets
+} from "@/lib/storage/googleSheets";
+
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+  const username = String(body.username || "admin");
   const password = String(body.password || "");
-  const expected = process.env.ADMIN_PASSWORD || "admin123";
 
-  if (!password || password !== expected) {
-    return NextResponse.json(
-      {
-        success: false,
-        message: "Password admin salah."
-      },
-      { status: 401 }
-    );
+  if (isGoogleSheetsConfigured()) {
+    const result = await loginAdminToGoogleSheets(username, password);
+
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, message: result.message || "Login gagal." },
+        { status: 401 }
+      );
+    }
+
+    return createAdminSessionResponse({
+      success: true,
+      user: result.user
+    });
   }
 
-  const response = NextResponse.json({ success: true });
+  const fallbackPassword = process.env.ADMIN_PASSWORD || "admin123";
 
-  response.cookies.set(ADMIN_COOKIE_NAME, "1", {
-    httpOnly: false,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 12
-  });
+  if (username === "admin" && password === fallbackPassword) {
+    return createAdminSessionResponse({
+      success: true,
+      user: {
+        username: "admin",
+        role: "superadmin"
+      }
+    });
+  }
 
-  return response;
+  return NextResponse.json(
+    { success: false, message: "Username atau password salah." },
+    { status: 401 }
+  );
 }

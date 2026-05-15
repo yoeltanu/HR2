@@ -1,4 +1,8 @@
-"use client";
+const fs = require("fs");
+
+fs.writeFileSync(
+  "app/admin/candidate/[id]/page.tsx",
+`"use client";
 
 import { useEffect, useState } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
@@ -8,41 +12,6 @@ import {
   seedSampleDemoRecords
 } from "@/lib/storage/localStorageDemo";
 import type { AssessmentRecord } from "@/types/assessment";
-
-function getDiscPrimary(value: unknown): "D" | "I" | "S" | "C" {
-  const first = String(value || "C").charAt(0).toUpperCase();
-
-  if (first === "D" || first === "I" || first === "S" || first === "C") {
-    return first;
-  }
-
-  return "C";
-}
-
-function getDiscPercentages(row: any) {
-  const fromSheet = {
-    D: Number(row.pct_D || row.disc_D || 0),
-    I: Number(row.pct_I || row.disc_I || 0),
-    S: Number(row.pct_S || row.disc_S || 0),
-    C: Number(row.pct_C || row.disc_C || 0)
-  };
-
-  const total =
-    fromSheet.D + fromSheet.I + fromSheet.S + fromSheet.C;
-
-  if (total > 0) return fromSheet;
-
-  const type = String(row.disc_type || row.discType || "C").toUpperCase();
-
-  const fallback = { D: 15, I: 15, S: 15, C: 15 };
-
-  if (type.includes("D")) fallback.D = 55;
-  if (type.includes("I")) fallback.I = 55;
-  if (type.includes("S")) fallback.S = 55;
-  if (type.includes("C")) fallback.C = 55;
-
-  return fallback;
-}
 
 function rowToRecord(row: any): AssessmentRecord {
   const candidateId = String(row.candidate_id || row.candidateId || "");
@@ -70,16 +39,12 @@ function rowToRecord(row: any): AssessmentRecord {
         S: Number(row.raw_S || 0),
         C: Number(row.raw_C || 0)
       },
-      percentages: getDiscPercentages(row),
-      adjusted: {
-        D: Number(row.adjusted_D || row.raw_D || 0),
-        I: Number(row.adjusted_I || row.raw_I || 0),
-        S: Number(row.adjusted_S || row.raw_S || 0),
-        C: Number(row.adjusted_C || row.raw_C || 0)
+      percentages: {
+        D: Number(row.pct_D || row.disc_D || 0),
+        I: Number(row.pct_I || row.disc_I || 0),
+        S: Number(row.pct_S || row.disc_S || 0),
+        C: Number(row.pct_C || row.disc_C || 0)
       },
-      primary: getDiscPrimary(row.disc_type || row.discType),
-      durationSeconds: Number(row.disc_duration_seconds || 0),
-      changeCount: Number(row.disc_change_count || 0),
       type: String(row.disc_type || row.discType || "-"),
       fitScore: Number(row.disc_fit_score || row.discFitScore || 0),
       fitCategory: String(row.disc_fit_category || "-"),
@@ -88,12 +53,12 @@ function rowToRecord(row: any): AssessmentRecord {
         .filter(Boolean),
       recommendation: String(row.disc_recommendation || "-"),
       interpretation: {
-        title: "DISC " + String(row.disc_type || "-"),
+        type: String(row.disc_type || "-"),
+        title: String(row.disc_type || "-"),
         summary: String(row.summary || row.disc_summary || "Data detail DISC dari Google Sheets belum lengkap."),
         strengths: [],
         risks: [],
-        managementTips: [],
-        suitableRoles: []
+        managementTips: []
       }
     },
     discAnswers: [],
@@ -236,3 +201,8 @@ export default function CandidateDetailPage({
     </AdminLayout>
   );
 }
+`,
+  "utf8"
+);
+
+console.log("✅ Fixed candidate detail page for Google Sheets row summary.");
