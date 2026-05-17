@@ -1,4 +1,17 @@
-"use client";
+const fs = require("fs");
+const path = require("path");
+
+const file = "app/admin/settings/page.tsx";
+const backup = `app/admin/settings/page.backup.${Date.now()}.tsx`;
+
+if (fs.existsSync(file)) {
+  fs.copyFileSync(file, backup);
+  console.log("Backup created:", backup);
+}
+
+fs.mkdirSync(path.dirname(file), { recursive: true });
+
+fs.writeFileSync(file, `"use client";
 
 import { useEffect, useState } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
@@ -257,12 +270,16 @@ export default function SettingsPage() {
             Konfigurasi Divisi / Posisi Kandidat
           </h2>
 
+          <p className="mt-1 text-sm text-slate-500">
+            Divisi / posisi aktif akan muncul di form kandidat.
+          </p>
+
           <div className="mt-5 flex gap-3">
             <input
               className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-cyan-500"
               value={newPosition}
               onChange={(event) => setNewPosition(event.target.value)}
-              placeholder="Tambah divisi / posisi"
+              placeholder="Tambah divisi / posisi, contoh: Content Creator"
             />
 
             <button
@@ -283,7 +300,9 @@ export default function SettingsPage() {
                   className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-cyan-500"
                   value={position.label}
                   onChange={(event) =>
-                    updatePosition(index, { label: event.target.value })
+                    updatePosition(index, {
+                      label: event.target.value
+                    })
                   }
                 />
 
@@ -292,7 +311,9 @@ export default function SettingsPage() {
                     type="checkbox"
                     checked={position.active}
                     onChange={(event) =>
-                      updatePosition(index, { active: event.target.checked })
+                      updatePosition(index, {
+                        active: event.target.checked
+                      })
                     }
                   />
                   Aktif
@@ -313,6 +334,11 @@ export default function SettingsPage() {
           <h2 className="text-2xl font-black text-slate-950">
             Konfigurasi Level Test
           </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            HR dapat mengubah label, deskripsi, durasi, jumlah soal, dan status
+            aktif level. Nilai level tetap 1, 2, dan 3 agar scoring tetap aman.
+          </p>
 
           <div className="mt-5 space-y-4">
             {config.levels.map((level) => (
@@ -399,3 +425,7 @@ export default function SettingsPage() {
     </AdminLayout>
   );
 }
+`, "utf8");
+
+console.log("✅ Fixed settings page safely.");
+console.log("Backup:", backup);

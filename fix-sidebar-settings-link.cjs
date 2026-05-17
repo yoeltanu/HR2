@@ -1,4 +1,8 @@
-"use client";
+const fs = require("fs");
+
+fs.writeFileSync(
+  "components/layout/Sidebar.tsx",
+`"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -67,3 +71,8 @@ export default function Sidebar() {
     </aside>
   );
 }
+`,
+  "utf8"
+);
+
+console.log("✅ Sidebar fixed: Settings -> /admin/settings, Admin Users -> /admin/users");

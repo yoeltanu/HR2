@@ -1,4 +1,8 @@
-"use client";
+const fs = require("fs");
+
+fs.writeFileSync(
+  "app/admin/login/page.tsx",
+`"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -94,3 +98,8 @@ export default function AdminLoginPage() {
     </main>
   );
 }
+`,
+  "utf8"
+);
+
+console.log("✅ Removed local demo fallback login from admin login page.");

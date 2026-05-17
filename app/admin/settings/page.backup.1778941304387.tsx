@@ -21,9 +21,7 @@ export default function SettingsPage() {
   const [config, setConfig] = useState<HRAdminConfig | null>(null);
   const [newPosition, setNewPosition] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
-  const [whatsappTemplate, setWhatsappTemplate] = useState(
-    DEFAULT_WHATSAPP_TEMPLATE
-  );
+  const [whatsappTemplate, setWhatsappTemplate] = useState(DEFAULT_WHATSAPP_TEMPLATE);
 
   useEffect(() => {
     setConfig(getAdminConfig());
@@ -59,11 +57,11 @@ export default function SettingsPage() {
   }
 
   async function saveWhatsappTemplate() {
-    saveDemoAdminSettings({
-      whatsapp_candidate_message_template: whatsappTemplate
-    });
-
     try {
+      saveDemoAdminSettings({
+        whatsapp_candidate_message_template: whatsappTemplate
+      });
+
       await fetch("/api/settings", {
         method: "POST",
         headers: {
@@ -74,9 +72,11 @@ export default function SettingsPage() {
           value: whatsappTemplate
         })
       });
-    } catch {}
 
-    showSaved("Template WhatsApp berhasil disimpan.");
+      showSaved("Template WhatsApp berhasil disimpan.");
+    } catch {
+      showSaved("Template tersimpan di Demo Mode.");
+    }
   }
 
   function addPosition() {
@@ -90,7 +90,7 @@ export default function SettingsPage() {
     );
 
     if (exists) {
-      alert("Divisi / posisi sudah ada.");
+      alert("Posisi sudah ada.");
       return;
     }
 
@@ -123,7 +123,7 @@ export default function SettingsPage() {
   function removePosition(index: number) {
     if (!config) return;
 
-    const ok = confirm("Hapus divisi / posisi ini dari pilihan kandidat?");
+    const ok = confirm("Hapus posisi ini dari pilihan kandidat?");
     if (!ok) return;
 
     updateConfig({
@@ -150,9 +150,7 @@ export default function SettingsPage() {
     const ok = confirm("Reset semua settings ke default?");
     if (!ok) return;
 
-    const nextConfig = resetAdminConfig();
-
-    setConfig(nextConfig);
+    setConfig(resetAdminConfig());
     setWhatsappTemplate(DEFAULT_WHATSAPP_TEMPLATE);
     saveDemoAdminSettings({
       whatsapp_candidate_message_template: DEFAULT_WHATSAPP_TEMPLATE
@@ -181,8 +179,8 @@ export default function SettingsPage() {
                 Admin Settings
               </h1>
               <p className="mt-2 max-w-3xl text-slate-600">
-                Kelola template WhatsApp, nomor HR, divisi / posisi kandidat,
-                dan level assessment.
+                HR dapat mengatur pilihan posisi kandidat, label level assessment,
+                nomor WhatsApp HR, dan template pesan WhatsApp kandidat.
               </p>
             </div>
 
@@ -199,6 +197,12 @@ export default function SettingsPage() {
               {savedMessage}
             </p>
           )}
+
+          <div className="mt-6 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+            Catatan: konfigurasi ini berlaku untuk form kandidat pada browser
+            yang sama. Untuk produksi multi-admin, konfigurasi sebaiknya
+            dipindahkan ke Google Sheets / database.
+          </div>
         </div>
 
         <section className="rounded-3xl bg-white p-6 shadow-sm">
@@ -238,6 +242,9 @@ export default function SettingsPage() {
           <h2 className="text-2xl font-black text-slate-950">
             Nomor WhatsApp HR
           </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Nomor ini dapat ditampilkan sebagai kontak HR internal.
+          </p>
 
           <input
             className="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-cyan-500"
@@ -254,17 +261,19 @@ export default function SettingsPage() {
 
         <section className="rounded-3xl bg-white p-6 shadow-sm">
           <h2 className="text-2xl font-black text-slate-950">
-            Konfigurasi Divisi / Posisi Kandidat
+            Pilihan Posisi Kandidat
           </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Posisi aktif akan muncul di form kandidat.
+          </p>
 
           <div className="mt-5 flex gap-3">
             <input
               className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-cyan-500"
               value={newPosition}
               onChange={(event) => setNewPosition(event.target.value)}
-              placeholder="Tambah divisi / posisi"
+              placeholder="Tambah posisi baru, contoh: Content Creator"
             />
-
             <button
               onClick={addPosition}
               className="rounded-2xl bg-cyan-500 px-5 py-3 font-bold text-navy-950 hover:bg-cyan-400"
@@ -283,7 +292,9 @@ export default function SettingsPage() {
                   className="rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-cyan-500"
                   value={position.label}
                   onChange={(event) =>
-                    updatePosition(index, { label: event.target.value })
+                    updatePosition(index, {
+                      label: event.target.value
+                    })
                   }
                 />
 
@@ -292,7 +303,9 @@ export default function SettingsPage() {
                     type="checkbox"
                     checked={position.active}
                     onChange={(event) =>
-                      updatePosition(index, { active: event.target.checked })
+                      updatePosition(index, {
+                        active: event.target.checked
+                      })
                     }
                   />
                   Aktif
@@ -311,8 +324,12 @@ export default function SettingsPage() {
 
         <section className="rounded-3xl bg-white p-6 shadow-sm">
           <h2 className="text-2xl font-black text-slate-950">
-            Konfigurasi Level Test
+            Label Level Assessment
           </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            HR dapat mengubah label dan status aktif level. Nilai level tetap
+            1, 2, dan 3 agar scoring tetap aman.
+          </p>
 
           <div className="mt-5 space-y-4">
             {config.levels.map((level) => (
