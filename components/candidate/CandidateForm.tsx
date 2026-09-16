@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CandidateInfo } from "@/types/candidate";
 import {
@@ -8,7 +8,11 @@ import {
   getCandidateDraft,
   saveCandidateDraft
 } from "@/lib/storage/localStorageDemo";
-import { getActiveLevels, getActivePositions } from "@/lib/storage/adminConfig";
+import type {
+  AssessmentLevelOption,
+  PositionOption
+} from "@/lib/storage/adminConfig";
+import { getIQQuestionCountByLevel } from "@/lib/iq/iqQuestions";
 import { validateCandidateInfo } from "@/lib/utils/validation";
 
 const initialForm: CandidateInfo = {
@@ -30,33 +34,109 @@ export default function CandidateForm() {
   const [form, setForm] = useState<CandidateInfo>(initialForm);
   const [errors, setErrors] = useState<string[]>([]);
   const [customPosition, setCustomPosition] = useState("");
-  const [positions, setPositions] = useState(getActivePositions());
-  const [levels, setLevels] = useState(getActiveLevels());
-
-  const positionLabels = useMemo(
-    () => positions.map((position) => position.label),
-    [positions]
-  );
+  const [positions, setPositions] = useState<PositionOption[]>([]);
+  const [levels, setLevels] = useState<AssessmentLevelOption[]>([]);
+  const [configUpdatedAt, setConfigUpdatedAt] = useState("");
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configError, setConfigError] = useState("");
 
   useEffect(() => {
-    const existing = getCandidateDraft();
+    let cancelled = false;
 
-    setPositions(getActivePositions());
-    setLevels(getActiveLevels());
-
-    if (existing) {
-      const isKnown = positionLabels.includes(existing.positionApplied);
-
-      if (!isKnown && existing.positionApplied) {
-        setCustomPosition(existing.positionApplied);
-        setForm({
-          ...existing,
-          positionApplied: "Lainnya"
+    async function loadPublicConfig() {
+      try {
+        const response = await fetch("/api/public/settings", {
+          cache: "no-store"
         });
-      } else {
-        setForm(existing);
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.message || "Gagal memuat konfigurasi assessment."
+          );
+        }
+
+        const nextPositions: PositionOption[] = Array.isArray(data.positions)
+          ? data.positions
+          : [];
+        const nextLevels: AssessmentLevelOption[] = Array.isArray(data.levels)
+          ? data.levels
+          : [];
+
+        if (cancelled) return;
+
+        setPositions(nextPositions);
+        setLevels(nextLevels);
+        setConfigUpdatedAt(String(data.updatedAt || ""));
+        setConfigError("");
+
+        const existing = getCandidateDraft();
+        const defaultLevel = nextLevels[0]?.value || 1;
+
+        if (!existing) {
+          setForm({
+            ...initialForm,
+            assessmentLevel: defaultLevel
+          });
+          return;
+        }
+
+        const levelStillActive = nextLevels.some(
+          (level) => level.value === existing.assessmentLevel
+        );
+        const positionStillActive = nextPositions.some(
+          (position) => position.label === existing.positionApplied
+        );
+        const hasOtherPosition = nextPositions.some(
+          (position) => position.label === "Lainnya"
+        );
+
+        if (
+          existing.positionApplied &&
+          !positionStillActive &&
+          hasOtherPosition
+        ) {
+          setCustomPosition(existing.positionApplied);
+          setForm({
+            ...existing,
+            positionApplied: "Lainnya",
+            assessmentLevel: levelStillActive
+              ? existing.assessmentLevel
+              : defaultLevel,
+            assessmentConfigSnapshot: undefined
+          });
+        } else {
+          setForm({
+            ...existing,
+            positionApplied: positionStillActive
+              ? existing.positionApplied
+              : "",
+            assessmentLevel: levelStillActive
+              ? existing.assessmentLevel
+              : defaultLevel,
+            assessmentConfigSnapshot: undefined
+          });
+        }
+      } catch (error) {
+        if (cancelled) return;
+
+        setPositions([]);
+        setLevels([]);
+        setConfigError(
+          error instanceof Error
+            ? error.message
+            : "Konfigurasi assessment tidak dapat dimuat."
+        );
+      } finally {
+        if (!cancelled) setConfigLoading(false);
       }
     }
+
+    loadPublicConfig();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function update<K extends keyof CandidateInfo>(
@@ -71,7 +151,10 @@ export default function CandidateForm() {
 
   function resetDraft() {
     clearAssessmentDraft();
-    setForm(initialForm);
+    setForm({
+      ...initialForm,
+      assessmentLevel: levels[0]?.value || 1
+    });
     setCustomPosition("");
     setErrors([]);
   }
@@ -79,15 +162,55 @@ export default function CandidateForm() {
   function submit(event: React.FormEvent) {
     event.preventDefault();
 
+    const selectedLevel = levels.find(
+      (level) => level.value === form.assessmentLevel
+    );
+
+    const preValidationErrors: string[] = [];
+
+    if (!selectedLevel) {
+      preValidationErrors.push(
+        "Assessment level yang dipilih sudah tidak aktif. Muat ulang halaman dan pilih level yang tersedia."
+      );
+    }
+
+    const availableQuestionCount = selectedLevel
+      ? getIQQuestionCountByLevel(selectedLevel.value)
+      : 0;
+
+    if (selectedLevel && availableQuestionCount < 1) {
+      preValidationErrors.push(
+        `Question bank untuk Level ${selectedLevel.value} belum tersedia.`
+      );
+    }
+
+    const effectiveQuestionCount = selectedLevel
+      ? Math.min(selectedLevel.totalQuestions, availableQuestionCount)
+      : 0;
+
     const finalForm: CandidateInfo = {
       ...form,
       positionApplied:
         form.positionApplied === "Lainnya"
           ? customPosition.trim()
-          : form.positionApplied
+          : form.positionApplied,
+      assessmentConfigSnapshot: selectedLevel
+        ? {
+            level: selectedLevel.value,
+            label: selectedLevel.label,
+            description: selectedLevel.description,
+            durationMinutes: selectedLevel.durationMinutes,
+            totalQuestions: effectiveQuestionCount,
+            configuredTotalQuestions: selectedLevel.totalQuestions,
+            configUpdatedAt
+          }
+        : undefined
     };
 
-    const validation = validateCandidateInfo(finalForm);
+    const validation = [
+      ...preValidationErrors,
+      ...validateCandidateInfo(finalForm)
+    ];
     setErrors(validation);
 
     if (validation.length > 0) return;
@@ -96,6 +219,10 @@ export default function CandidateForm() {
     router.push("/test/instructions");
   }
 
+  const selectedLevel = levels.find(
+    (level) => level.value === form.assessmentLevel
+  );
+
   return (
     <form
       onSubmit={submit}
@@ -103,17 +230,15 @@ export default function CandidateForm() {
     >
       <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
-          <p className="text-sm font-semibold text-cyan-700">
-            Data Kandidat
-          </p>
+          <p className="text-sm font-semibold text-cyan-700">Data Kandidat</p>
 
           <h1 className="mt-2 text-3xl font-black text-slate-950">
             Isi identitas sebelum mulai assessment
           </h1>
 
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-            Pilihan posisi dan level assessment dapat diatur HR melalui Admin
-            Settings.
+            Pilihan posisi dan level assessment mengikuti konfigurasi aktif dari
+            HR Admin.
           </p>
         </div>
 
@@ -125,6 +250,20 @@ export default function CandidateForm() {
           Reset Draft
         </button>
       </div>
+
+      {configLoading && (
+        <div className="mb-6 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+          Memuat konfigurasi assessment...
+        </div>
+      )}
+
+      {configError && (
+        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <p className="font-bold">Konfigurasi assessment gagal dimuat.</p>
+          <p className="mt-1">{configError}</p>
+          <p className="mt-1">Silakan muat ulang halaman sebelum melanjutkan.</p>
+        </div>
+      )}
 
       {errors.length > 0 && (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -163,11 +302,14 @@ export default function CandidateForm() {
           </span>
 
           <select
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-cyan-500"
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-cyan-500 disabled:bg-slate-50"
             value={form.positionApplied}
+            disabled={configLoading || positions.length === 0}
             onChange={(event) => update("positionApplied", event.target.value)}
           >
-            <option value="">Pilih posisi</option>
+            <option value="">
+              {configLoading ? "Memuat posisi..." : "Pilih posisi"}
+            </option>
             {positions.map((position) => (
               <option key={position.id} value={position.label}>
                 {position.label}
@@ -226,8 +368,9 @@ export default function CandidateForm() {
           </span>
 
           <select
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-cyan-500"
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-cyan-500 disabled:bg-slate-50"
             value={form.assessmentLevel}
+            disabled={configLoading || levels.length === 0}
             onChange={(event) =>
               update("assessmentLevel", Number(event.target.value) as 1 | 2 | 3)
             }
@@ -240,10 +383,7 @@ export default function CandidateForm() {
           </select>
 
           <p className="mt-2 text-xs leading-5 text-slate-500">
-            {
-              levels.find((level) => level.value === form.assessmentLevel)
-                ?.description
-            }
+            {selectedLevel?.description}
           </p>
         </label>
       </div>
@@ -268,7 +408,15 @@ export default function CandidateForm() {
         Soal dibuat original untuk kebutuhan screening internal HR.
       </div>
 
-      <button className="mt-6 w-full rounded-2xl bg-cyan-500 px-6 py-4 font-bold text-navy-950 hover:bg-cyan-400">
+      <button
+        disabled={
+          configLoading ||
+          Boolean(configError) ||
+          positions.length === 0 ||
+          levels.length === 0
+        }
+        className="mt-6 w-full rounded-2xl bg-cyan-500 px-6 py-4 font-bold text-navy-950 hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
+      >
         Lanjut ke Instruksi
       </button>
     </form>

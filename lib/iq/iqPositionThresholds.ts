@@ -78,7 +78,7 @@ export const iqPositionThresholds: Record<string, IQThreshold> = {
   }
 };
 
-export function findIQPositionName(position: string): string {
+function matchIQPositionName(position: string): string | null {
   const normalized = position.toLowerCase();
 
   const exact = Object.keys(iqPositionThresholds).find((key) =>
@@ -87,9 +87,13 @@ export function findIQPositionName(position: string): string {
 
   if (exact) return exact;
   if (normalized.includes("sales")) return "Head of Sales";
-  if (normalized.includes("warehouse") || normalized.includes("gudang")) return "Warehouse Leader";
+  if (normalized.includes("warehouse") || normalized.includes("gudang")) {
+    return "Warehouse Leader";
+  }
   if (normalized.includes("packing")) return "Packing Staff";
-  if (normalized.includes("cs") || normalized.includes("customer")) return "Customer Service";
+  if (normalized.includes("cs") || normalized.includes("customer")) {
+    return "Customer Service";
+  }
   if (
     normalized.includes("ecommerce") ||
     normalized.includes("e-commerce") ||
@@ -98,7 +102,15 @@ export function findIQPositionName(position: string): string {
     return "E-commerce Specialist";
   }
 
-  return "Accounting";
+  return null;
+}
+
+export function hasIQPositionProfile(position: string): boolean {
+  return Boolean(matchIQPositionName(position));
+}
+
+export function findIQPositionName(position: string): string {
+  return matchIQPositionName(position) || "Accounting";
 }
 
 export function scoreIQFit(
@@ -120,14 +132,15 @@ export function scoreIQFit(
     penalties.push((threshold.total - totalScore) * 1.2);
   }
 
-  (["logical", "numerical", "verbal", "pattern", "workingAccuracy"] as const)
-    .forEach((key) => {
+  (["logical", "numerical", "verbal", "pattern", "workingAccuracy"] as const).forEach(
+    (key) => {
       const min = threshold[key];
 
       if (min && subtests[key] < min) {
         penalties.push((min - subtests[key]) * 1.1);
       }
-    });
+    }
+  );
 
   fit -= penalties.reduce((sum, value) => sum + value, 0);
   fit = Math.max(35, Math.min(100, Math.round(fit)));

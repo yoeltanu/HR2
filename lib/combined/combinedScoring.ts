@@ -4,7 +4,9 @@ import type {
   CombinedResult
 } from "@/types/assessment";
 import { scoreDisc } from "@/lib/disc/discScoring";
+import { hasDiscPositionProfile } from "@/lib/disc/discPositionProfiles";
 import { scoreIQ } from "@/lib/iq/iqScoring";
+import { hasIQPositionProfile } from "@/lib/iq/iqPositionThresholds";
 import { createCandidateId } from "@/lib/utils/id";
 import { getCombinedCategory, roundScore } from "@/lib/utils/format";
 
@@ -97,7 +99,11 @@ export function buildAssessmentRecord(
     {
       durationSeconds: payload.iqMeta.durationSeconds,
       changeCount: payload.iqMeta.changeCount,
-      timedOut: payload.iqMeta.timedOut
+      timedOut: payload.iqMeta.timedOut,
+      totalDurationSeconds:
+        payload.candidate.assessmentConfigSnapshot?.durationMinutes
+          ? payload.candidate.assessmentConfigSnapshot.durationMinutes * 60
+          : undefined
     }
   );
 
@@ -107,15 +113,34 @@ export function buildAssessmentRecord(
     payload.candidate.positionApplied
   );
 
-  const redFlags = [...disc.redFlags, ...iqScored.result.redFlags];
+  const scoringProfileMissing =
+    !hasDiscPositionProfile(payload.candidate.positionApplied) ||
+    !hasIQPositionProfile(payload.candidate.positionApplied);
+
+  const scoringWarnings = scoringProfileMissing
+    ? [
+        `Posisi "${payload.candidate.positionApplied}" belum memiliki scoring profile khusus. Fit score masih memakai fallback profile Accounting dan perlu ditinjau HR.`
+      ]
+    : [];
+
+  const redFlags = [
+    ...disc.redFlags,
+    ...iqScored.result.redFlags,
+    ...scoringWarnings
+  ];
 
   const summary = [
     `${payload.candidate.fullName} melamar posisi ${payload.candidate.positionApplied}.`,
     `DISC ${disc.type} dengan fit ${disc.fitScore}.`,
     `Cognitive Ability Screening ${iqScored.result.percentageScore}% dengan fit ${iqScored.result.fitScore}.`,
     `Rekomendasi akhir: ${combined.recommendation}.`,
+    scoringProfileMissing
+      ? "Catatan scoring: posisi belum memiliki profile khusus dan sedang menggunakan fallback Accounting."
+      : "",
     "Catatan: hasil assessment adalah alat bantu HR dan bukan satu-satunya dasar keputusan hiring."
-  ].join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return {
     candidate_id: candidateId,

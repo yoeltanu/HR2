@@ -1,5 +1,15 @@
 export type AssessmentLevel = 1 | 2 | 3;
 
+export interface AssessmentConfigSnapshot {
+  level: AssessmentLevel;
+  label: string;
+  description: string;
+  durationMinutes: number;
+  totalQuestions: number;
+  configuredTotalQuestions?: number;
+  configUpdatedAt: string;
+}
+
 export interface CandidateInfo {
   fullName: string;
   whatsapp: string;
@@ -11,6 +21,7 @@ export interface CandidateInfo {
   lastExperience: string;
   source: string;
   assessmentLevel: AssessmentLevel;
+  assessmentConfigSnapshot?: AssessmentConfigSnapshot;
   consent: boolean;
 }
 

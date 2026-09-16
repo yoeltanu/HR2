@@ -12,6 +12,22 @@ export function validateCandidateInfo(data: CandidateInfo): string[] {
     errors.push("Assessment level wajib dipilih.");
   }
 
+  if (data.assessmentConfigSnapshot) {
+    const snapshot = data.assessmentConfigSnapshot;
+
+    if (snapshot.level !== data.assessmentLevel) {
+      errors.push("Snapshot assessment level tidak sesuai dengan pilihan kandidat.");
+    }
+
+    if (snapshot.durationMinutes <= 0) {
+      errors.push("Durasi assessment tidak valid.");
+    }
+
+    if (snapshot.totalQuestions <= 0) {
+      errors.push("Jumlah soal assessment tidak valid.");
+    }
+  }
+
   if (!data.consent) {
     errors.push("Persetujuan data wajib dicentang.");
   }
@@ -32,6 +48,18 @@ export function validateAssessmentPayload(payload: AssessmentPayload): string[] 
 
   if (!Array.isArray(payload.iqAnswers) || payload.iqAnswers.length < 1) {
     errors.push("Jawaban Cognitive Ability Screening belum tersedia.");
+  }
+
+  const snapshot = payload.candidate.assessmentConfigSnapshot;
+
+  if (
+    snapshot &&
+    Array.isArray(payload.iqAnswers) &&
+    payload.iqAnswers.length !== snapshot.totalQuestions
+  ) {
+    errors.push(
+      `Jumlah soal assessment tidak sesuai snapshot (${snapshot.totalQuestions} soal).`
+    );
   }
 
   return errors;

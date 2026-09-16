@@ -6,7 +6,8 @@ import Navbar from "@/components/layout/Navbar";
 import AssessmentProgress from "@/components/candidate/AssessmentProgress";
 import IQQuestionCard from "@/components/iq/IQQuestionCard";
 import IQTimer from "@/components/iq/IQTimer";
-import { getIQDurationSeconds, getIQQuestionsByLevel } from "@/lib/iq/iqQuestions";
+import { getIQQuestionsByLevel } from "@/lib/iq/iqQuestions";
+import { getDefaultLevelConfig } from "@/lib/storage/adminConfig";
 import {
   clearAssessmentDraft,
   getCandidateDraft,
@@ -25,7 +26,9 @@ export default function IQPage() {
   const [candidate, setCandidate] = useState<CandidateInfo | null>(null);
   const [started, setStarted] = useState(false);
   const [startedAt, setStartedAt] = useState("");
-  const [secondsLeft, setSecondsLeft] = useState(20 * 60);
+  const [secondsLeft, setSecondsLeft] = useState(
+    getDefaultLevelConfig(1).durationMinutes * 60
+  );
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<IQAnswer[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -38,18 +41,34 @@ export default function IQPage() {
       return;
     }
 
+    const fallback = getDefaultLevelConfig(draft.assessmentLevel);
+    const snapshot =
+      draft.assessmentConfigSnapshot?.level === draft.assessmentLevel
+        ? draft.assessmentConfigSnapshot
+        : null;
+
     setCandidate(draft);
-    setSecondsLeft(getIQDurationSeconds(draft.assessmentLevel));
+    setSecondsLeft(
+      (snapshot?.durationMinutes || fallback.durationMinutes) * 60
+    );
     setAnswers(getJson<IQAnswer[]>(storageKeys.IQ_KEY, []));
   }, [router]);
 
   const level = candidate?.assessmentLevel || 1;
+  const fallbackLevel = getDefaultLevelConfig(level);
+  const levelSnapshot =
+    candidate?.assessmentConfigSnapshot?.level === level
+      ? candidate.assessmentConfigSnapshot
+      : null;
+  const questionLimit =
+    levelSnapshot?.totalQuestions || fallbackLevel.totalQuestions;
 
   const questions = useMemo(() => {
-    return getIQQuestionsByLevel(level);
-  }, [level]);
+    return getIQQuestionsByLevel(level).slice(0, questionLimit);
+  }, [level, questionLimit]);
 
-  const totalDuration = getIQDurationSeconds(level);
+  const totalDuration =
+    (levelSnapshot?.durationMinutes || fallbackLevel.durationMinutes) * 60;
 
   useEffect(() => {
     saveJson(storageKeys.IQ_KEY, answers);
@@ -60,15 +79,18 @@ export default function IQPage() {
       if (!candidate || submitting) return;
 
       if (questions.length === 0) {
-        alert(
-          "Question bank untuk level ini belum dipasang. Gunakan Level 1 dulu atau lanjutkan Part 4B."
-        );
+        alert("Question bank untuk level ini belum tersedia.");
         return;
       }
 
       const blank =
         questions.length -
-        answers.filter((answer) => answer.selectedAnswer).length;
+        questions.filter((question) =>
+          answers.find(
+            (answer) =>
+              answer.questionId === question.id && answer.selectedAnswer
+          )
+        ).length;
 
       if (!timedOut && blank > 0) {
         const ok = confirm(`Masih ada ${blank} soal kosong. Tetap submit?`);
@@ -204,12 +226,11 @@ export default function IQPage() {
               Cognitive Ability Screening
             </p>
             <h1 className="mt-2 text-3xl font-black text-slate-950">
-              Question bank Level {level} belum dipasang
+              Question bank Level {level} belum tersedia
             </h1>
             <p className="mt-4 leading-7 text-slate-600">
-              Part 4A memasang Level 1 lengkap. Level 2 dan Level 3 akan
-              dipasang di Part 4B. Untuk test sekarang, kembali ke form kandidat
-              dan pilih Level 1.
+              Silakan kembali ke form kandidat dan pilih level assessment yang
+              tersedia.
             </p>
             <button
               onClick={() => router.push("/test/start")}
@@ -275,7 +296,11 @@ export default function IQPage() {
     (answer) => answer.questionId === current.id
   );
 
-  const answered = answers.filter((answer) => answer.selectedAnswer).length;
+  const answered = questions.filter((question) =>
+    answers.find(
+      (answer) => answer.questionId === question.id && answer.selectedAnswer
+    )
+  ).length;
 
   return (
     <main className="min-h-screen bg-slate-50">
