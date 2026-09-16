@@ -33,12 +33,21 @@ export function scoreIQ(
     durationSeconds: number;
     changeCount: number;
     timedOut: boolean;
+    totalDurationSeconds?: number;
   }
 ): {
   result: IQResult;
   enrichedAnswers: IQAnswer[];
 } {
-  const questions = getIQQuestionsByLevel(level);
+  const requestedQuestionIds = new Set(
+    answers.map((answer) => answer.questionId).filter(Boolean)
+  );
+  const allLevelQuestions = getIQQuestionsByLevel(level);
+  const questions = requestedQuestionIds.size
+    ? allLevelQuestions.filter((question) =>
+        requestedQuestionIds.has(question.id)
+      )
+    : allLevelQuestions;
 
   const answerMap = new Map(
     answers.map((answer) => [answer.questionId, answer])
@@ -111,8 +120,12 @@ export function scoreIQ(
 
   const fit = scoreIQFit(percentageScore, subtests, positionApplied);
 
-  const totalDurationSeconds =
+  const fallbackDurationSeconds =
     level === 1 ? 20 * 60 : level === 2 ? 30 * 60 : 40 * 60;
+  const totalDurationSeconds =
+    meta.totalDurationSeconds && meta.totalDurationSeconds > 0
+      ? meta.totalDurationSeconds
+      : fallbackDurationSeconds;
 
   const redFlags = buildIQRedFlags({
     questions,

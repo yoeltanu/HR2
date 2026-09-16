@@ -64,7 +64,9 @@ export const discPositionProfiles: DiscPositionProfile[] = [
   }
 ];
 
-export function findDiscPositionProfile(position: string): DiscPositionProfile {
+function matchDiscPositionProfile(
+  position: string
+): DiscPositionProfile | undefined {
   const normalized = position.toLowerCase();
 
   const exact = discPositionProfiles.find((profile) =>
@@ -74,26 +76,40 @@ export function findDiscPositionProfile(position: string): DiscPositionProfile {
   if (exact) return exact;
 
   if (normalized.includes("sales")) {
-    return discPositionProfiles.find((item) => item.position === "Head of Sales")!;
+    return discPositionProfiles.find((item) => item.position === "Head of Sales");
   }
 
   if (normalized.includes("warehouse") || normalized.includes("gudang")) {
-    return discPositionProfiles.find((item) => item.position === "Warehouse Leader")!;
+    return discPositionProfiles.find(
+      (item) => item.position === "Warehouse Leader"
+    );
   }
 
   if (normalized.includes("packing")) {
-    return discPositionProfiles.find((item) => item.position === "Packing Staff")!;
+    return discPositionProfiles.find((item) => item.position === "Packing Staff");
   }
 
   if (normalized.includes("cs") || normalized.includes("customer")) {
-    return discPositionProfiles.find((item) => item.position === "Customer Service")!;
+    return discPositionProfiles.find(
+      (item) => item.position === "Customer Service"
+    );
   }
 
   if (normalized.includes("marketplace") || normalized.includes("ecommerce")) {
-    return discPositionProfiles.find((item) => item.position === "E-commerce Specialist")!;
+    return discPositionProfiles.find(
+      (item) => item.position === "E-commerce Specialist"
+    );
   }
 
-  return discPositionProfiles[0];
+  return undefined;
+}
+
+export function hasDiscPositionProfile(position: string): boolean {
+  return Boolean(matchDiscPositionProfile(position));
+}
+
+export function findDiscPositionProfile(position: string): DiscPositionProfile {
+  return matchDiscPositionProfile(position) || discPositionProfiles[0];
 }
 
 export function scoreDiscFit(

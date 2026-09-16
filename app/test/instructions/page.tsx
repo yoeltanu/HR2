@@ -6,6 +6,7 @@ import { CheckCircle2, ClipboardList, TimerReset } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import type { CandidateInfo } from "@/types/candidate";
 import { getCandidateDraft } from "@/lib/storage/localStorageDemo";
+import { getDefaultLevelConfig } from "@/lib/storage/adminConfig";
 
 export default function InstructionsPage() {
   const [candidate, setCandidate] = useState<CandidateInfo | null>(null);
@@ -15,8 +16,13 @@ export default function InstructionsPage() {
   }, []);
 
   const level = candidate?.assessmentLevel || 1;
-  const iqTotal = level === 1 ? 25 : level === 2 ? 35 : 45;
-  const iqDuration = level === 1 ? 20 : level === 2 ? 30 : 40;
+  const fallbackLevel = getDefaultLevelConfig(level);
+  const snapshot =
+    candidate?.assessmentConfigSnapshot?.level === level
+      ? candidate.assessmentConfigSnapshot
+      : null;
+  const iqTotal = snapshot?.totalQuestions || fallbackLevel.totalQuestions;
+  const iqDuration = snapshot?.durationMinutes || fallbackLevel.durationMinutes;
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -24,9 +30,7 @@ export default function InstructionsPage() {
 
       <section className="mx-auto max-w-4xl px-4 py-12">
         <div className="rounded-3xl bg-white p-8 shadow-premium">
-          <p className="text-sm font-bold text-cyan-700">
-            Instruksi Assessment
-          </p>
+          <p className="text-sm font-bold text-cyan-700">Instruksi Assessment</p>
 
           <h1 className="mt-2 text-3xl font-black text-slate-950">
             DISC + Cognitive Ability Screening
