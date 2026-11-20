@@ -32,6 +32,12 @@ export default function CandidateForm() {
   const [customPosition, setCustomPosition] = useState("");
   const [positions, setPositions] = useState(getActivePositions());
   const [levels, setLevels] = useState(getActiveLevels());
+  // Login nama + WhatsApp (data pelamar dari ERP). `offline` = database rekrutmen belum dikonfigurasi → form manual lama.
+  const [login, setLogin] = useState({ fullName: "", whatsapp: "" });
+  const [loginError, setLoginError] = useState("");
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const verified = Boolean(form.assignmentId);
 
   const positionLabels = useMemo(
     () => positions.map((position) => position.label),
@@ -76,13 +82,39 @@ export default function CandidateForm() {
     setErrors([]);
   }
 
+  async function signIn(event: React.FormEvent) {
+    event.preventDefault();
+    setLoginError("");
+    setLoginBusy(true);
+    try {
+      const res = await fetch("/api/candidate-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(login)
+      });
+      const data = await res.json();
+      if (data.configured === false) return setOffline(true);
+      if (!res.ok || !data.success) return setLoginError(data.message || "Login gagal.");
+      setForm((current) => ({
+        ...current,
+        ...data.candidate,
+        assessmentLevel: data.level,
+        assignmentId: data.assignmentId
+      }));
+    } catch {
+      setLoginError("Tidak bisa terhubung ke server. Coba lagi.");
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
   function submit(event: React.FormEvent) {
     event.preventDefault();
 
     const finalForm: CandidateInfo = {
       ...form,
       positionApplied:
-        form.positionApplied === "Lainnya"
+        !verified && form.positionApplied === "Lainnya"
           ? customPosition.trim()
           : form.positionApplied
     };
@@ -94,6 +126,44 @@ export default function CandidateForm() {
 
     saveCandidateDraft(finalForm);
     router.push("/test/instructions");
+  }
+
+  if (!verified && !offline) {
+    return (
+      <form onSubmit={signIn} className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-premium md:p-8">
+        <p className="text-sm font-semibold text-cyan-700">Login Kandidat</p>
+        <h1 className="mt-2 text-2xl font-black text-slate-950">Masuk untuk mulai assessment</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          Gunakan nama lengkap dan nomor WhatsApp yang sama dengan saat Anda mendaftar.
+        </p>
+
+        {loginError && (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{loginError}</div>
+        )}
+
+        <div className="mt-5 space-y-4">
+          <Field
+            label="Nama lengkap*"
+            value={login.fullName}
+            onChange={(value) => setLogin((l) => ({ ...l, fullName: value }))}
+            placeholder="Contoh: Andi Pratama"
+          />
+          <Field
+            label="Nomor WhatsApp*"
+            value={login.whatsapp}
+            onChange={(value) => setLogin((l) => ({ ...l, whatsapp: value }))}
+            placeholder="Contoh: 081234567890"
+          />
+        </div>
+
+        <button
+          disabled={loginBusy}
+          className="mt-6 w-full rounded-2xl bg-cyan-500 px-6 py-4 font-bold text-navy-950 hover:bg-cyan-400 disabled:opacity-60"
+        >
+          {loginBusy ? "Memeriksa…" : "Masuk"}
+        </button>
+      </form>
+    );
   }
 
   return (
@@ -139,6 +209,7 @@ export default function CandidateForm() {
         <Field
           label="Nama lengkap*"
           value={form.fullName}
+          disabled={verified}
           onChange={(value) => update("fullName", value)}
           placeholder="Contoh: Andi Pratama"
         />
@@ -146,6 +217,7 @@ export default function CandidateForm() {
         <Field
           label="Nomor WhatsApp*"
           value={form.whatsapp}
+          disabled={verified}
           onChange={(value) => update("whatsapp", value)}
           placeholder="Contoh: 081234567890"
         />
@@ -157,6 +229,9 @@ export default function CandidateForm() {
           placeholder="nama@email.com"
         />
 
+        {verified ? (
+          <Field label="Posisi dilamar*" value={form.positionApplied} disabled onChange={() => {}} />
+        ) : (
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">
             Posisi dilamar*
@@ -175,8 +250,9 @@ export default function CandidateForm() {
             ))}
           </select>
         </label>
+        )}
 
-        {form.positionApplied === "Lainnya" && (
+        {!verified && form.positionApplied === "Lainnya" && (
           <Field
             label="Tulis posisi lainnya*"
             value={customPosition}
@@ -228,6 +304,7 @@ export default function CandidateForm() {
           <select
             className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-cyan-500"
             value={form.assessmentLevel}
+            disabled={verified}
             onChange={(event) =>
               update("assessmentLevel", Number(event.target.value) as 1 | 2 | 3)
             }
@@ -279,12 +356,14 @@ function Field({
   label,
   value,
   onChange,
-  placeholder = ""
+  placeholder = "",
+  disabled = false
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  disabled?: boolean;
 }) {
   return (
     <label className="block">
@@ -293,8 +372,9 @@ function Field({
       </span>
 
       <input
-        className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-cyan-500"
+        className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-cyan-500 disabled:bg-slate-100 disabled:text-slate-500"
         value={value}
+        disabled={disabled}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
