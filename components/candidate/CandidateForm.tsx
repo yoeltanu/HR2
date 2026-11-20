@@ -134,7 +134,7 @@ export default function CandidateForm() {
         <p className="text-sm font-semibold text-cyan-700">Login Kandidat</p>
         <h1 className="mt-2 text-2xl font-black text-slate-950">Masuk untuk mulai assessment</h1>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          Gunakan nama lengkap dan nomor WhatsApp yang sama dengan saat Anda mendaftar.
+          Masukkan nama dan nomor telepon yang Anda gunakan saat mendaftar.
         </p>
 
         {loginError && (
@@ -143,16 +143,16 @@ export default function CandidateForm() {
 
         <div className="mt-5 space-y-4">
           <Field
-            label="Nama lengkap*"
+            label="Nama*"
             value={login.fullName}
             onChange={(value) => setLogin((l) => ({ ...l, fullName: value }))}
-            placeholder="Contoh: Andi Pratama"
+            placeholder="Nama"
           />
           <Field
-            label="Nomor WhatsApp*"
+            label="No. telepon*"
             value={login.whatsapp}
             onChange={(value) => setLogin((l) => ({ ...l, whatsapp: value }))}
-            placeholder="Contoh: 081234567890"
+            placeholder="No. telepon"
           />
         </div>
 
