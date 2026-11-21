@@ -12,6 +12,8 @@ export interface CandidateInfo {
   source: string;
   assessmentLevel: AssessmentLevel;
   consent: boolean;
+  /** Penugasan tes HR2 dari ERP (diisi saat login nama + WhatsApp). */
+  assignmentId?: string;
 }
 
 export interface CandidateSummaryRow {
