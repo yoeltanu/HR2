@@ -53,7 +53,8 @@ export default function CandidateForm() {
     if (existing) {
       const isKnown = positionLabels.includes(existing.positionApplied);
 
-      if (!isKnown && existing.positionApplied) {
+      // Kandidat login ERP memakai nama posisi asli dari database; jangan ditimpa "Lainnya".
+      if (!existing.assignmentId && !isKnown && existing.positionApplied) {
         setCustomPosition(existing.positionApplied);
         setForm({
           ...existing,
