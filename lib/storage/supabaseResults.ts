@@ -57,12 +57,38 @@ export interface Hr2Assignment {
 
 const ACTIVE = "status=in.(assigned,started)";
 
+/** Kesalahan validasi permanen (bukan gangguan jaringan): percobaan ulang tidak akan mengubahnya. */
+export class PermanentSyncError extends Error {}
+
+const ASSIGNMENT_ID_RE = /^[0-9a-f-]{36}$/i;
+
+/** Level dan posisi resmi dari penugasan, dipakai untuk menimpa nilai yang dikirim klien. */
+export async function getHr2AssignmentContext(
+  assignmentId: string
+): Promise<{ level: number; positionTitle: string }> {
+  if (!ASSIGNMENT_ID_RE.test(assignmentId)) throw new PermanentSyncError("Penugasan tes tidak valid.");
+
+  const [a] = await rest(
+    `recruitment_test_assignments?select=id,candidate_id,test_type,config&id=eq.${assignmentId}`
+  );
+  if (!a || a.test_type !== "hr2") throw new PermanentSyncError("Penugasan tes tidak ditemukan.");
+
+  const level = [1, 2, 3].includes(Number(a.config?.level)) ? Number(a.config.level) : 1;
+
+  const [cand] = await rest(`recruitment_candidates?select=position_id&id=eq.${a.candidate_id}`);
+  const pos = cand?.position_id
+    ? await rest(`hiring_positions?select=title&id=eq.${cand.position_id}`)
+    : null;
+
+  return { level, positionTitle: (pos?.[0]?.title as string) || "" };
+}
+
 /** Cocokkan nama + nomor WhatsApp dengan pelamar. Bila ada beberapa baris, pilih yang punya penugasan HR2 aktif. */
 export async function findHr2Candidate(fullName: string, whatsapp: string) {
   const phone = normalizePhone(whatsapp);
   if (phone.length < 10) return null;
   const rows: CandidateRow[] = await rest(
-    `recruitment_candidates?select=id,full_name,email,phone_number,address,position_id&phone_number=in.(${phone},0${phone.slice(2)})`
+    `recruitment_candidates?select=id,full_name,email,phone_number,address,position_id&phone_number=in.(${phone},0${phone.slice(2)},620${phone.slice(2)})`
   );
   const matches = rows.filter((r) => r.full_name && sameName(r.full_name, fullName));
   if (matches.length === 0) return null;
@@ -91,14 +117,14 @@ export async function markAssignmentStarted(assignment: Hr2Assignment) {
  */
 export async function saveHr2Result(payload: AssessmentPayload, record: AssessmentRecord) {
   const assignmentId = payload.candidate.assignmentId;
-  if (!assignmentId || !/^[0-9a-f-]{36}$/i.test(assignmentId)) throw new Error("Penugasan tes tidak valid.");
+  if (!assignmentId || !ASSIGNMENT_ID_RE.test(assignmentId)) throw new PermanentSyncError("Penugasan tes tidak valid.");
 
   const [a] = await rest(
     `recruitment_test_assignments?select=id,candidate_id,test_type,status&id=eq.${assignmentId}`
   );
-  if (!a || a.test_type !== "hr2") throw new Error("Penugasan tes tidak ditemukan.");
+  if (!a || a.test_type !== "hr2") throw new PermanentSyncError("Penugasan tes tidak ditemukan.");
   if (a.status === "submitted") return { already: true };
-  if (a.status !== "assigned" && a.status !== "started") throw new Error("Penugasan tes sudah tidak aktif.");
+  if (a.status !== "assigned" && a.status !== "started") throw new PermanentSyncError("Penugasan tes sudah tidak aktif.");
 
   const [cand] = await rest(`recruitment_candidates?select=full_name,phone_number&id=eq.${a.candidate_id}`);
   if (
@@ -107,7 +133,7 @@ export async function saveHr2Result(payload: AssessmentPayload, record: Assessme
     !sameName(cand.full_name, payload.candidate.fullName) ||
     normalizePhone(cand.phone_number) !== normalizePhone(payload.candidate.whatsapp)
   ) {
-    throw new Error("Identitas tidak cocok dengan penugasan tes.");
+    throw new PermanentSyncError("Identitas tidak cocok dengan penugasan tes.");
   }
 
   try {

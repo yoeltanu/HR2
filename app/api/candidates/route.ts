@@ -1,23 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_COOKIE_NAME } from "@/lib/utils/auth";
+import { isAdminRequest } from "@/lib/utils/adminSession";
 import {
   fetchCandidatesFromGoogleSheets,
   isGoogleSheetsConfigured
 } from "@/lib/storage/googleSheets";
 
 export async function GET(request: NextRequest) {
-  const cookieValue = request.cookies.get(ADMIN_COOKIE_NAME)?.value;
-
-  if (cookieValue !== "1") {
+  if (!isAdminRequest(request)) {
     return NextResponse.json(
       {
         success: false,
         source: "next-auth-cookie",
-        message: "Unauthorized",
-        debug: {
-          cookieName: ADMIN_COOKIE_NAME,
-          cookieValue: cookieValue || null
-        }
+        message: "Unauthorized"
       },
       { status: 401 }
     );

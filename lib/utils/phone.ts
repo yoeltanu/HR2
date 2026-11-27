@@ -1,6 +1,6 @@
 /** Seragam berawalan 62 (format yang disimpan portal pendaftaran): 0812…, +62812…, 812… → 62812…. */
 export function normalizePhone(raw: string): string {
-  const digits = (raw || "").replace(/\D/g, "");
+  const digits = (raw || "").replace(/\D/g, "").replace(/^620+/, "62");
   if (digits.startsWith("62")) return digits;
   if (digits.startsWith("0")) return `62${digits.slice(1)}`;
   if (digits.startsWith("8")) return `62${digits}`;

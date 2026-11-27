@@ -2,15 +2,27 @@ import { NextResponse } from "next/server";
 import type { AssessmentPayload } from "@/types/assessment";
 import { buildAssessmentRecord } from "@/lib/combined/combinedScoring";
 import { validateAssessmentPayload } from "@/lib/utils/validation";
-import { isSupabaseConfigured, saveHr2Result } from "@/lib/storage/supabaseResults";
+import {
+  PermanentSyncError,
+  getHr2AssignmentContext,
+  isSupabaseConfigured,
+  saveHr2Result
+} from "@/lib/storage/supabaseResults";
 import {
   isGoogleSheetsConfigured,
   submitToGoogleSheets
 } from "@/lib/storage/googleSheets";
 
+const RETRY_MESSAGE = "Hasil belum tersimpan karena gangguan koneksi. Klik Submit Final sekali lagi.";
+
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as AssessmentPayload;
+    let payload: AssessmentPayload;
+    try {
+      payload = (await request.json()) as AssessmentPayload;
+    } catch {
+      return NextResponse.json({ success: false, message: "Format data tidak valid." }, { status: 400 });
+    }
     const errors = validateAssessmentPayload(payload);
 
     if (errors.length > 0) {
@@ -24,20 +36,42 @@ export async function POST(request: Request) {
       );
     }
 
+    // Level dan posisi diambil dari penugasan, bukan dari klien.
+    const linked = isSupabaseConfigured() && Boolean(payload.candidate.assignmentId);
+    if (linked) {
+      try {
+        const context = await getHr2AssignmentContext(payload.candidate.assignmentId as string);
+        if (Number(payload.candidate.assessmentLevel) !== context.level) {
+          return NextResponse.json(
+            { success: false, message: "Level tes tidak sesuai penugasan. Hubungi HR." },
+            { status: 403 }
+          );
+        }
+        if (context.positionTitle) payload.candidate.positionApplied = context.positionTitle;
+      } catch (error) {
+        if (!(error instanceof PermanentSyncError)) {
+          console.error("[api/submit] assignment", error instanceof Error ? error.message : error);
+          return NextResponse.json({ success: false, message: RETRY_MESSAGE }, { status: 503 });
+        }
+      }
+    }
+
     const record = buildAssessmentRecord(payload);
 
-    // Salinan hasil ke database ERP (idempoten). Gagal di sini tidak membatalkan penyimpanan ke Google Sheets.
+    // Salinan hasil ke database ERP (idempoten). Gagal permanen tidak membatalkan Google Sheets;
+    // gangguan sementara dihentikan dulu agar percobaan ulang tidak menduplikasi baris Sheets.
     let supabase: { success: boolean; message?: string } | undefined;
-    if (isSupabaseConfigured() && payload.candidate.assignmentId) {
+    if (linked) {
       try {
         await saveHr2Result(payload, record);
         supabase = { success: true };
       } catch (error) {
-        console.error("[api/submit] supabase", error instanceof Error ? error.message : error);
-        supabase = {
-          success: false,
-          message: error instanceof Error ? error.message : "Gagal menyimpan ke database ERP."
-        };
+        if (!(error instanceof PermanentSyncError)) {
+          console.error("[api/submit] supabase", error instanceof Error ? error.message : error);
+          return NextResponse.json({ success: false, message: RETRY_MESSAGE }, { status: 503 });
+        }
+        console.error("[api/submit] supabase", error.message);
+        supabase = { success: false, message: error.message };
       }
     }
 
@@ -76,7 +110,9 @@ export async function POST(request: Request) {
         });
       }
 
-      throw error;
+      // Pesan dari Apps Script (mis. HTML) tidak ditampilkan ke kandidat.
+      console.error("[api/submit] sheets", error instanceof Error ? error.message : error);
+      return NextResponse.json({ success: false, message: RETRY_MESSAGE }, { status: 503 });
     }
   } catch (error) {
     return NextResponse.json(
