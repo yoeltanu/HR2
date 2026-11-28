@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_COOKIE_NAME } from "@/lib/utils/auth";
+import { isAdminRequest } from "@/lib/utils/adminSession";
 import {
   addAdminUserToGoogleSheets,
   getAdminUsersFromGoogleSheets,
@@ -9,7 +9,7 @@ import {
 } from "@/lib/storage/googleSheets";
 
 function requireAdmin(request: NextRequest) {
-  return request.cookies.get(ADMIN_COOKIE_NAME)?.value === "1";
+  return isAdminRequest(request);
 }
 
 export async function GET(request: NextRequest) {

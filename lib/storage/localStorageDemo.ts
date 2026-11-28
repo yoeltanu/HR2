@@ -9,6 +9,7 @@ const DISC_KEY = "hr_assessment_disc_answers";
 const DISC_META_KEY = "hr_assessment_disc_meta";
 const IQ_KEY = "hr_assessment_iq_answers";
 const IQ_META_KEY = "hr_assessment_iq_meta";
+const IQ_STARTED_KEY = "hr_assessment_iq_started_at";
 const RECORDS_KEY = "hr_assessment_demo_records";
 const LAST_RECORD_KEY = "hr_assessment_last_record";
 
@@ -18,6 +19,7 @@ export const storageKeys = {
   DISC_META_KEY,
   IQ_KEY,
   IQ_META_KEY,
+  IQ_STARTED_KEY,
   RECORDS_KEY,
   LAST_RECORD_KEY
 };
@@ -154,7 +156,8 @@ export function clearAssessmentDraft(): void {
     DISC_KEY,
     DISC_META_KEY,
     IQ_KEY,
-    IQ_META_KEY
+    IQ_META_KEY,
+    IQ_STARTED_KEY
   ].forEach((key) => localStorage.removeItem(key));
 }
 

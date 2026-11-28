@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_COOKIE_NAME } from "@/lib/utils/auth";
+import { isAdminRequest } from "@/lib/utils/adminSession";
 import { fetchCandidateDetailFromGoogleSheets } from "@/lib/storage/googleSheets";
 
 export async function GET(
@@ -10,7 +10,7 @@ export async function GET(
     };
   }
 ) {
-  const isAdmin = request.cookies.get(ADMIN_COOKIE_NAME)?.value === "1";
+  const isAdmin = isAdminRequest(request);
 
   if (!isAdmin) {
     return NextResponse.json(

@@ -4,6 +4,7 @@ import {
   isSupabaseConfigured,
   markAssignmentStarted
 } from "@/lib/storage/supabaseResults";
+import { clientIp, isBlocked, recordFailure } from "@/lib/utils/rateLimit";
 
 const fail = (status: number, message: string, extra: object = {}) =>
   NextResponse.json({ success: false, message, ...extra }, { status });
@@ -13,12 +14,17 @@ export async function POST(request: Request) {
   if (!isSupabaseConfigured()) {
     return fail(503, "Koneksi database rekrutmen belum dikonfigurasi.", { configured: false });
   }
+  const ip = clientIp(request);
+  if (isBlocked(ip)) {
+    return fail(429, "Terlalu banyak percobaan. Coba lagi dalam 10 menit.");
+  }
   try {
     const { fullName, whatsapp } = (await request.json()) as { fullName?: string; whatsapp?: string };
     if (!fullName?.trim() || !whatsapp?.trim()) return fail(400, "Nama dan nomor WhatsApp wajib diisi.");
 
     const found = await findHr2Candidate(fullName, whatsapp);
     if (!found) {
+      recordFailure(ip);
       return fail(404, "Data tidak ditemukan. Pastikan nama dan nomor WhatsApp sama dengan saat mendaftar.");
     }
     const { candidate, assignment, positionTitle } = found;

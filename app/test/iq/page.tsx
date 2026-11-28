@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import AssessmentProgress from "@/components/candidate/AssessmentProgress";
@@ -19,6 +19,10 @@ import type { CandidateInfo } from "@/types/candidate";
 import type { IQAnswer } from "@/types/iq";
 import type { AssessmentPayload } from "@/types/assessment";
 
+/** Identitas satu pengerjaan: penugasan (atau nomor WA) + nama + level. */
+const attemptOwner = (c: CandidateInfo) =>
+  [c.assignmentId || c.whatsapp, c.fullName, c.assessmentLevel].join("|");
+
 export default function IQPage() {
   const router = useRouter();
 
@@ -29,6 +33,7 @@ export default function IQPage() {
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<IQAnswer[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const autoSubmitted = useRef(false);
 
   useEffect(() => {
     const draft = getCandidateDraft();
@@ -40,7 +45,18 @@ export default function IQPage() {
 
     setCandidate(draft);
     setSecondsLeft(getIQDurationSeconds(draft.assessmentLevel));
-    setAnswers(getJson<IQAnswer[]>(storageKeys.IQ_KEY, []));
+
+    // Waktu dihitung dari mulai pertama: reload atau kembali ke halaman ini melanjutkan sisa waktu, tidak mengulang.
+    // Hanya untuk peserta yang sama; sisa pengerjaan orang lain di komputer yang sama tidak boleh terbawa.
+    const saved = getJson<{ at?: string; owner?: string } | null>(storageKeys.IQ_STARTED_KEY, null);
+    const begun = saved?.owner === attemptOwner(draft) ? saved.at : "";
+    setAnswers(saved && !begun ? [] : getJson<IQAnswer[]>(storageKeys.IQ_KEY, []));
+    if (begun) {
+      const elapsed = Math.floor((Date.now() - new Date(begun).getTime()) / 1000) || 0;
+      setStartedAt(begun);
+      setSecondsLeft(Math.max(0, getIQDurationSeconds(draft.assessmentLevel) - elapsed));
+      setStarted(true);
+    }
   }, [router]);
 
   const level = candidate?.assessmentLevel || 1;
@@ -151,7 +167,11 @@ export default function IQPage() {
     if (!started || submitting) return;
 
     if (secondsLeft <= 0) {
-      submitAssessment(true);
+      // Hanya sekali: kegagalan submit tidak boleh memicu pengiriman ulang otomatis berulang.
+      if (!autoSubmitted.current) {
+        autoSubmitted.current = true;
+        submitAssessment(true);
+      }
       return;
     }
 
@@ -164,11 +184,13 @@ export default function IQPage() {
 
   function start() {
     const now = new Date().toISOString();
+    if (candidate) saveJson(storageKeys.IQ_STARTED_KEY, { at: now, owner: attemptOwner(candidate) });
     setStartedAt(now);
     setStarted(true);
   }
 
   function setAnswer(answer: IQAnswer) {
+    if (secondsLeft <= 0) return; // jawaban dikunci setelah waktu habis
     setAnswers((current) => {
       const next = current.filter(
         (item) => item.questionId !== answer.questionId
@@ -327,7 +349,7 @@ export default function IQPage() {
 
             <button
               disabled={submitting}
-              onClick={() => submitAssessment(false)}
+              onClick={() => submitAssessment(secondsLeft <= 0)}
               className="rounded-2xl bg-navy-950 px-5 py-3 font-bold text-white disabled:opacity-50"
             >
               {submitting ? "Submitting..." : "Submit Final"}

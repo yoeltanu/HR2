@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
-import { ADMIN_COOKIE_NAME } from "@/lib/utils/auth";
+import { isAdminRequest } from "@/lib/utils/adminSession";
 import {
   fetchSettingsFromGoogleSheets,
   updateSettingToGoogleSheets,
@@ -9,7 +9,7 @@ import {
 import { DEFAULT_WHATSAPP_TEMPLATE } from "@/lib/utils/whatsapp";
 
 export async function GET(request: NextRequest) {
-  const isAdmin = request.cookies.get(ADMIN_COOKIE_NAME)?.value === "1";
+  const isAdmin = isAdminRequest(request);
 
   if (!isAdmin) {
     return NextResponse.json(
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const isAdmin = request.cookies.get(ADMIN_COOKIE_NAME)?.value === "1";
+  const isAdmin = isAdminRequest(request);
 
   if (!isAdmin) {
     return NextResponse.json(
